@@ -1,0 +1,17 @@
+QUESTION2:
+------------------------------------------------------------------------------
+We need to write code that will query the meta data of an instance within AWS or Azure or GCP
+and provide a json formatted output. 
+The choice of language and implementation is up to you
+--------------------------------------------------------------------------------
+Solution2:
+-----------------------------------------------------------------------------------
+To solve this question we are using shell and the command to get the resource metadata
+$key = network
+$metadata=$(curl -H Metadata:true "http://169.254.169.254/metadata/instance/$key?api-version=2021-02-01")
+echo $metadata >> /tmp/metadata.json
+----------------------------------------------------------------------------------
+
+if we like to refer the first element from netowrk.interface we can use below command ( source microsoft documentation)
+
+curl -H Metadata:true "http://169.254.169.254/metadata/instance/network/interface/0?api-version=2021-02-01"

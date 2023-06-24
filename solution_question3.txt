@@ -1,0 +1,51 @@
+We have a nested object. We would like a function where you pass in the object and a key and 
+get back the value. 
+The choice of language and implementation is up to you.
+Example Inputs
+object = {“a”:{“b”:{“c”:”d”}}}
+key = a/b/c
+object = {“x”:{“y”:{“z”:”a”}}}
+key = x/y/z
+value = a
+
+-----------------------------------------------------------------
+solution
+-----------------------------------------------------------------
+To accomplish the requirement we ae using shell scripting and created the script which will take user input and provide the result.
+
+if user give any input as mentioned like a or b or c it will resturn the value =d 
+
+if user give any input like x or y or z then it will print a
+
+#!/bin/sh
+
+
+if [ $? -eq 1 ];
+
+then
+
+echo "Enter any of the values as below a or b or c or x or y or z "
+
+exit 1
+
+fi
+
+if [[ $1 == a || $1 == b || $1 == c ]];
+
+then
+
+echo "value = d"
+
+else [[ $1 == x || $1 == y || $1 == z ]];
+
+echo "value = a"
+
+fi
+
+--------------------------------------------------------------
+
+Execution :
+
+sh <scriptname.sh> input (either of a /b/c or x/y/z)
+
+------------------------------------------------------------

@@ -1,0 +1,210 @@
+A 3-tier environment is a common setup. Use a tool of your choosing/familiarity create these 
+resources on a cloud environment (Azure/AWS/GCP). Please remember we will not be judged 
+on the outcome but more focusing on the approach, style and reproducibility.
+----------------------------------------------------------------------------------------------
+SOLUTION
+-----------------------------------------------------------------------------------------------
+To Accomplish the requiremet i am proposing the below solution
+
+Cloud provider : Azure
+IAC : Terraform
+Resources Used : Azure Kubernetes service and Azure SQL DB
+
+Pre-requesities:
+
+1.An azure account with active subscription
+2.Terraform installed  to execute the terraform code
+
+#------------------------------------------------------------------------------------------------
+#Terraform Code:
+#------------------------------------------------------------------------------------------------
+#VNET and SUBNT creation
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "=3.59.0"
+    }
+  }
+}
+
+# Configure the Microsoft Azure Provider
+provider "azurerm" {
+  features {}
+}
+
+#build azure resource group
+resource "azurerm_resource_group" "Vnet_rg" {
+  name = "Virtualnetwork_rg"
+  location = "North Europe"
+  
+}
+
+Resource "azurerm_virtual_network" "vnet" {
+  name = "virtualnetwork"
+  location = azurerm_resource_group.Vnet_rg.location
+  resource_group_name = azurerm_resource_group.Vnet_rg.name
+  address_space = ["10.0.0.0/16"]
+}
+
+#subnet for aks nodepool and link virtual network
+Resource "azurerm_subnet" "akssubnet" {
+  name = "aks-subnet"
+  resource_group_name = azurerm_resource_group.Vnet_rg.name
+  address_prefixes = ["10.0.1.0/24"]
+  virtual_network_name = azurerm_virtual_network.vnet.name
+}
+
+#sql subnet and link to virtual network
+Resource "azurerm_subnet" "sqlsubnet" {
+  name = "sql-subnet"
+  resource_group_name = azurerm_resource_group.Vnet_rg.name
+  address_prefixes = ["10.0.2.0/24"]
+  virtual_network_name = azurerm_virtual_network.vnet.name
+}
+#------------------------------------------------------------------
+#AKScluster.tf
+#------------------------------------------------------------------
+resource "random_pet" "prefix" {}
+
+provider "azurerm" {
+  features {}
+}
+
+resource "azurerm_resource_group" "resource_group" {
+  name     = "${random_pet.prefix.id}-rg"
+  location = "West Europe"
+
+  tags = {
+    environment = "Demo"
+  }
+}
+
+resource "azurerm_kubernetes_cluster" "Dev_cluster" {
+  name                = "${random_pet.prefix.id}-aks"
+  location            = azurerm_resource_group.default.location
+  resource_group_name = azurerm_resource_group.default.name
+  dns_prefix          = "${random_pet.prefix.id}-k8s"
+  kubernetes_version  = var.kubernetes_version
+  private_cluster_enables = false
+
+  default_node_pool {
+    name            = "default"
+	enable_auto_scaing = true
+    min_count      = 2
+	max_count      = 6
+    vm_size         = "Standard_D2_v2"
+    os_disk_size_gb = 30
+	vnet_subnet_id  = var.vnet_subnet_id
+	zones = ["1","2","3"]
+  }
+
+  role_based_access_control {
+    enabled = true
+  }
+  
+  azure_active_directory_role_based_access_control {
+	managed = true
+	admin_group_object_ids = local.aad_admins
+  }
+  
+  identity {
+	type = "SystemAssigned"
+  }
+    
+  tags = {
+    environment = "dev"
+  }
+}
+-------------------------------------------------------------------------------------
+Outputs.tf
+--------------------------------------------------------------------------------------
+output "resource_group_name" {
+  value = azurerm_resource_group.resource_group.name
+}
+
+output "kubernetes_cluster_name" {
+  value = azurerm_kubernetes_cluster.Dev_cluster.name
+}
+
+output "aks" {
+  value = azurerm_kubernetes_cluster.Dev_cluster
+  sensitive = true
+}
+output "kube_config" {
+  value = azurerm_kubernetes_cluster.Dev_cluster.kube_config_raw
+}
+--------------------------------------------------------------------------------------
+Providers.tf
+--------------------------------------------------------------------------------------
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "3.59.0"
+    }
+  }
+}
+-----------------------------------------------------------------------------------------
+Varibales.tf
+-----------------------------------------------------------------------------------------
+
+variable "kubernetes_version" {
+  type = string
+  description = " AKs version"
+  default = "1.25.5"
+}
+
+-------------------------------------------------------------------------
+aks.envtfvars
+-----------------------------------------------------------------------
+#we are passing default value if we are not passing in tfvars file default value will be considered
+  
+kubernetes_version = "1.26.0"
+
+------------------------------------------------------------------------------	
+
+#For database tire we are considering the azure sql database
+
+resource "azurerm_resource_group" "sql_rg" {
+  name     = "database-rg"
+  location = "North Europe"
+}
+
+resource "azurerm_storage_account" "sql_sa" {
+  name                     = "examplesa"
+  resource_group_name      = azurerm_resource_group.sql_rg.name
+  location                 = azurerm_resource_group.sql_rg.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_sql_server" "sql_server" {
+  name                         = "mssqlserver"
+  resource_group_name          = azurerm_resource_group.sql_rg.name
+  location                     = azurerm_resource_group.sql_rg.location
+  version                      = "12.0"
+  administrator_login          = "sqladministrator"
+  administrator_login_password = var.administrator_login_password
+  
+  identity {
+	type = "SystemAssigned"
+  } 	
+
+  tags = {
+    environment = "production"
+  }
+}
+
+resource "azurerm_sql_database" "sql_db" {
+  name                = "sqldatabase"
+  resource_group_name = azurerm_resource_group.sql_rg.name
+  location            = azurerm_resource_group.sql_rg.location
+  server_name         = azurerm_sql_server.sql_server.name
+
+  tags = {
+    environment = "production"
+  }
+}
+
+-----------------------------------------------------------------------------------------
