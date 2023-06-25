@@ -208,3 +208,14 @@ resource "azurerm_sql_database" "sql_db" {
 }
 
 -----------------------------------------------------------------------------------------
+
+Use below commands to create the infrastructure using terraform
+
+1.terraform init - to intialise the required providers and plugin
+2.terraform plan - to check the plan on what all resources is getting created
+3.terraform apply - to create the infrastructure on target platform
+4.terraform fmt - to formate the code
+5.terraform validate - to validated the syntax errors
+6.terraform destroy - to delete the infrastrucure
+
+------------------------------------------------------------------------------------------
